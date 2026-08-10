@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/tests/integration/*.test.js"
   },
   "keywords": [],
   "author": "",
