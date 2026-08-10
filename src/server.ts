@@ -1,5 +1,4 @@
-import { createServer } from 'node:http';
-
+import { createApp } from './app.js';
 import { initializeDatabase } from './database/database.js';
 import { loadMovies } from './database/load-movies.js';
 
@@ -8,17 +7,7 @@ const port = 3000;
 initializeDatabase();
 loadMovies();
 
-const server = createServer((request, response) => {
-  response.writeHead(200, {
-    'Content-Type': 'application/json',
-  });
-
-  response.end(
-    JSON.stringify({
-      status: 'ok',
-    }),
-  );
-});
+const server = createApp();
 
 server.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
