@@ -76,11 +76,18 @@ export function getProducerIntervals(): ProducerIntervalResponse {
     }
   }
 
-  const minInterval = Math.min(...intervals.map((item) => item.interval));
-  const maxInterval = Math.max(...intervals.map((item) => item.interval));
+    if (intervals.length === 0) {
+        return {
+            min: [],
+            max: [],
+        };
+    }
 
-  return {
-    min: intervals.filter((item) => item.interval === minInterval),
-    max: intervals.filter((item) => item.interval === maxInterval),
-  };
+    const minInterval = Math.min(...intervals.map((item) => item.interval));
+    const maxInterval = Math.max(...intervals.map((item) => item.interval));
+
+    return {
+        min: intervals.filter((item) => item.interval === minInterval),
+        max: intervals.filter((item) => item.interval === maxInterval),
+    };
 }
