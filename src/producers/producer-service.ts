@@ -1,10 +1,5 @@
 import { database } from '../database/database.js';
 
-interface WinningMovie {
-  year: number;
-  producers: string;
-}
-
 export interface ProducerInterval {
   producer: string;
   interval: number;
@@ -17,77 +12,70 @@ export interface ProducerIntervalResponse {
   max: ProducerInterval[];
 }
 
-function getWinningMovies(): WinningMovie[] {
-  return database
-    .prepare(`
-      SELECT year, producers
-      FROM movies
-      WHERE winner = 1
-      ORDER BY year ASC
-    `)
-    .all() as unknown as WinningMovie[];
-}
-
-function parseProducers(producers: string): string[] {
-  return producers
-    .split(/\s+and\s+|,\s*/)
-    .map((producer) => producer.trim())
-    .filter(Boolean);
+interface IntervalQueryRow extends ProducerInterval {
+  category: 'min' | 'max';
 }
 
 export function getProducerIntervals(): ProducerIntervalResponse {
-  const winningMovies = getWinningMovies();
-
-  const winsByProducer = new Map<string, number[]>();
-
-  for (const movie of winningMovies) {
-    const producers = parseProducers(movie.producers);
-
-    for (const producer of producers) {
-      const wins = winsByProducer.get(producer) ?? [];
-      wins.push(movie.year);
-      winsByProducer.set(producer, wins);
-    }
-  }
-
-  const intervals: ProducerInterval[] = [];
-
-  for (const [producer, wins] of winsByProducer.entries()) {
-    if (wins.length < 2) {
-      continue;
-    }
-
-    wins.sort((a, b) => a - b);
-
-    for (let index = 1; index < wins.length; index++) {
-      const previousWin = wins[index - 1];
-      const followingWin = wins[index];
-
-      if (previousWin === undefined || followingWin === undefined) {
-        continue;
-      }
-
-      intervals.push({
+  const rows = database
+    .prepare(
+      `
+      WITH producer_wins AS (
+        SELECT
+          mp.producer,
+          m.year,
+          LAG(m.year) OVER (
+            PARTITION BY mp.producer
+            ORDER BY m.year
+          ) AS previousWin
+        FROM movies m
+        INNER JOIN movie_producers mp
+          ON mp.movie_id = m.id
+        WHERE m.winner = 1
+      ),
+      intervals AS (
+        SELECT
+          producer,
+          year - previousWin AS interval,
+          previousWin,
+          year AS followingWin
+        FROM producer_wins
+        WHERE previousWin IS NOT NULL
+      ),
+      bounds AS (
+        SELECT
+          MIN(interval) AS minInterval,
+          MAX(interval) AS maxInterval
+        FROM intervals
+      )
+      SELECT
+        'min' AS category,
         producer,
-        interval: followingWin - previousWin,
+        interval,
         previousWin,
-        followingWin,
-      });
-    }
-  }
+        followingWin
+      FROM intervals, bounds
+      WHERE interval = minInterval
 
-    if (intervals.length === 0) {
-        return {
-            min: [],
-            max: [],
-        };
-    }
+      UNION ALL
 
-    const minInterval = Math.min(...intervals.map((item) => item.interval));
-    const maxInterval = Math.max(...intervals.map((item) => item.interval));
+      SELECT
+        'max' AS category,
+        producer,
+        interval,
+        previousWin,
+        followingWin
+      FROM intervals, bounds
+      WHERE interval = maxInterval
+    `,
+    )
+    .all() as unknown as IntervalQueryRow[];
 
-    return {
-        min: intervals.filter((item) => item.interval === minInterval),
-        max: intervals.filter((item) => item.interval === maxInterval),
-    };
+  return rows.reduce<ProducerIntervalResponse>(
+    (result, { category, ...interval }) => {
+      result[category].push(interval);
+      return result;
+    },
+    { min: [], max: [] },
+  );
 }
