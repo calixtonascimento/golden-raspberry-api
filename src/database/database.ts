@@ -1,6 +1,6 @@
-import { DatabaseSync } from 'node:sqlite';
+import { DatabaseSync } from "node:sqlite";
 
-export const database = new DatabaseSync(':memory:');
+export const database = new DatabaseSync(":memory:");
 
 export function initializeDatabase(): void {
   database.exec(`
@@ -12,5 +12,17 @@ export function initializeDatabase(): void {
       producers TEXT NOT NULL,
       winner INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS movie_producers (
+      movie_id INTEGER NOT NULL,
+      producer TEXT NOT NULL,
+      FOREIGN KEY (movie_id) REFERENCES movies(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_movie_producers_movie_id
+      ON movie_producers(movie_id);
+
+    CREATE INDEX IF NOT EXISTS idx_movie_producers_producer
+      ON movie_producers(producer);
   `);
 }
